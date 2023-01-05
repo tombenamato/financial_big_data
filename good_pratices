@@ -1,0 +1,17 @@
+Data must be placed in a separate directory. File location and name should contain metada, e.g. raw data in data/raw, daily/yahoo/IBM.csv
+Define function, not random bits of scripts in a notebook
+give meaningfull file names
+save plots/results to a suitable named directory e.g. results/plots/stylized_facts/price_returns_IBM_daily.png
+avoid loops (worst thing in python)
+
+
+Use parquet (arrow) representation for faster and compressed data, not csv.
+
+
+Which library?
+Polars for in memory computation, numba 
+(if gpu needed cupy, then cudf )
+
+Vaex out of memory computation
+
+For all use dask, easy parallelisation and is computation/library agnostic.
