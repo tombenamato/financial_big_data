@@ -6,6 +6,7 @@ avoid loops (worst thing in python)
 
 
 Use parquet (arrow) representation for faster and compressed data, not csv.
+Use Polars to read then cast if needed to pandas and use lz4 compression (800mbs write 5000 mbs write, ratio like snappy).
 
 
 Which library?
