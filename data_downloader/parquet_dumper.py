@@ -5,7 +5,7 @@ TEMPLATE_FILE_NAME = "{}-{}_{:02d}_{:02d}-{}_{:02d}_{:02d}.parquet"
 
 
 class ParquetDumper(object):
-    def __init__(self, symbol: str, start: pl.Date, end: pl.Date, folder: str) -> object:
+    def __init__(self, symbol: str, start: pl.Date, end: pl.Date, folder: str) -> None:
         """Initialize a new ParquetDumper instance.
 
         Args:
