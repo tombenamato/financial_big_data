@@ -1,105 +1,54 @@
 import concurrent
-import threading
-import time
-from collections import deque
 from datetime import timedelta, date
+import calendar
+from typing import List
+
+from tqdm.auto import tqdm
 
 from fetch import fetch_day
 from parquet_dumper import ParquetDumper
 from processor import decompress
-from utils import is_debug_mode, Logger
-
-SATURDAY = 5
-day_counter = 0
+from utils import Logger
 
 
-def days(start, end):
+def days(start: date, end: date) -> List[date]:
     if start > end:
-        return
+        return []
     end = end + timedelta(days=1)
     today = date.today()
     while start != end:
-        if start.weekday() != SATURDAY and start != today:
+        if start.weekday() != calendar.SATURDAY and start != today:
             yield start
         start = start + timedelta(days=1)
 
 
-def format_left_time(seconds):
-    if seconds < 0:
-        return "--:--:--"
-    m, s = divmod(seconds, 60)
-    h, m = divmod(m, 60)
-    return "%d:%02d:%02d" % (h, m, s)
-
-
-def update_progress(done, total, avg_time_per_job, threads):
-    progress = 1 if total == 0 else done / total
-    progress = int((1.0 if progress > 1.0 else progress) * 100)
-    remainder = 100 - progress
-    estimation = (avg_time_per_job * (total - done) / threads)
-    if not is_debug_mode():
-        print('\r[{0}] {1}%  Left : {2}  '.format('#' * progress + '-' * remainder, progress,
-                                                  format_left_time(estimation)), end='')
-
-
-def how_many_days(start, end):
+def how_many_days(start: date, end: date) -> int:
     return sum(1 for _ in days(start, end))
 
 
-def avg(fetch_times):
-    if len(fetch_times) != 0:
-        return sum(fetch_times) / len(fetch_times)
-    else:
-        return -1
+def do_work(symbol: str, day: date, parquet: ParquetDumper) -> None:
+    Logger.info("Fetching day {0}".format(day))
+    parquet.append(day, decompress(day, fetch_day(symbol, day)))
 
 
-
-
-def app(symbols, start, end, threads, folder):
+def app(symbols: List[str], start: date, end: date, threads: int, folder: str) -> None:
     if start > end:
         return
-    lock = threading.Lock()
-    global day_counter
     total_days = how_many_days(start, end) * len(symbols)
 
     if total_days == 0:
         return
 
-    last_fetch = deque([], maxlen=10)
-    update_progress(day_counter, total_days, -1, threads)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor, \
+            tqdm(total=total_days) as progress_bar:
+        for symbol in symbols:
+            with ParquetDumper(symbol, start, end, folder) as file:
+                work_queue = [(symbol, day) for day in days(start, end)]
+                futures = [executor.submit(do_work, symbol, day, file) for symbol, day in work_queue]
+                for future in concurrent.futures.as_completed(futures):
+                    if future.exception() is None:
+                        progress_bar.update(1)
+                    else:
+                        Logger.error("An error happened when fetching data: ", future.exception())
+    Logger.info("Fetching data terminated")
 
-    def do_work(symbol, day, csv):
-        global day_counter
-        star_time = time.time()
-        Logger.info("Fetching day {0}".format(day))
-        try:
-            csv.append(day, decompress( day, fetch_day(symbol, day)))
-        except Exception as e:
-            print("ERROR for {0}, {1} Exception : {2}".format(day, symbol, str(e)))
-        elapsed_time = time.time() - star_time
-        last_fetch.append(elapsed_time)
-        with lock:
-            day_counter += 1
-        Logger.info("Day {0} fetched in {1}s".format(day, elapsed_time))
-
-    futures = []
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-
-        files = {symbol: ParquetDumper(symbol, start, end, folder) for symbol in symbols}
-
-        for day in days(start, end):
-            for symbol in symbols:
-                futures.append(executor.submit(do_work, symbol, day, files[symbol]))
-
-        for future in concurrent.futures.as_completed(futures):
-            if future.exception() is None:
-                update_progress(day_counter, total_days, avg(last_fetch), threads)
-            else:
-                Logger.error("An error happen when fetching data : ", future.exception())
-
-        Logger.info("Fetching data terminated")
-        for file in files.values():
-            file.dump()
-
-    update_progress(day_counter, total_days, avg(last_fetch), threads)

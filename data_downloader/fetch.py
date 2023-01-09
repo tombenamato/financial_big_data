@@ -10,6 +10,7 @@ import requests
 from utils import Logger, is_dst
 
 
+
 URL = "http://datafeed.dukascopy.com/datafeed/{currency}/{year}/{month:02d}/{day:02d}_ticks.bi5"
 ATTEMPTS = 30
 

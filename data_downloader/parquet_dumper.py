@@ -4,8 +4,8 @@ from utils import Logger
 TEMPLATE_FILE_NAME = "{}-{}_{:02d}_{:02d}-{}_{:02d}_{:02d}.parquet"
 
 
-class ParquetDumper:
-    def __init__(self, symbol: str, start: pl.Date, end: pl.Date, folder: str) -> None:
+class ParquetDumper(object):
+    def __init__(self, symbol: str, start: pl.Date, end: pl.Date, folder: str) -> object:
         """Initialize a new ParquetDumper instance.
 
         Args:
@@ -18,6 +18,13 @@ class ParquetDumper:
         self.start = start
         self.end = end
         self.folder = folder
+
+    def __enter__(self):
+        self.buffer = {}
+        return self
+
+    def __exit__(self, *args):
+        self.dump()
         self.buffer = {}
 
     def append(self, day: pl.Date, ticks: pl.DataFrame) -> None:

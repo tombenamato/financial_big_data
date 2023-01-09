@@ -1,6 +1,7 @@
 import lzma
 import polars as pl
 import numpy as np
+from utils import Logger
 
 
 def bytes_to_data(buffer: bytes) -> pl.DataFrame:
@@ -60,6 +61,7 @@ def decompress(day: pl.Date, compressed_buffer: bytes) -> pl.DataFrame:
         decompressed_buffer = lzma.decompress(compressed_buffer)
     except lzma.error as e:
         # Handle decompression errors
+        Logger.error(f"Error decompressing buffer: {e}")
         print(f"Error decompressing buffer: {e}")
         return pl.DataFrame(columns=["time", "ask", "bid", "ask_volume", "bid_volume"])
 
