@@ -4,7 +4,7 @@ import argparse
 from datetime import date, timedelta
 
 from app import app
-from utils import valid_date, set_up_signals,valid_timeframe, TimeFrame
+from utils import valid_date, set_up_signals
 
 VERSION = '0.2.1'
 
@@ -21,10 +21,6 @@ def main():
     parser.add_argument('-e', '--enddate', type=valid_date, help='end date format YYYY-MM-DD (default today)')
     parser.add_argument('-t', '--thread', type=int, help='number of threads (default 20)', default=20)
     parser.add_argument('-f', '--folder', type=str, help='destination folder (default .)', default='.')
-    parser.add_argument('-c', '--candle', type=valid_timeframe,
-                        help='use candles instead of ticks. Accepted values M1 M2 M5 M10 M15 M30 H1 H4',
-                        default=TimeFrame.TICK)
-    parser.add_argument('--header', action='store_true', help='include CSV header (default True)', default=True)
     args = parser.parse_args()
 
     if args.startdate is not None:
@@ -38,7 +34,7 @@ def main():
         end = args.day
 
     set_up_signals()
-    app(args.symbols, start, end, args.thread, args.candle, args.folder, args.header)
+    app(args.symbols, start, end, args.thread, args.folder)
 
 
 if __name__ == '__main__':

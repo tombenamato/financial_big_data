@@ -11,33 +11,12 @@ TEMPLATE = '%(asctime)s - %(levelname)s - %(threadName)s [%(thread)d] -  %(messa
 SUNDAY = 7
 
 
-class TimeFrame(object):
-    TICK = 0
-    S_30 = 30
-    M1 = 60
-    M2 = 120
-    M5 = 300
-    M10 = 600
-    M15 = 900
-    M30 = 1800
-    H1 = 3600
-    H4 = 14400
-    D1 = 86400
-
 
 def valid_date(s):
     try:
         return datetime.strptime(s, "%Y-%m-%d").date()
     except ValueError:
         msg = "Not a valid date: '{0}'.".format(s)
-        raise argparse.ArgumentTypeError(msg)
-
-
-def valid_timeframe(s):
-    try:
-        return getattr(TimeFrame, s.upper())
-    except AttributeError:
-        msg = "Not a valid time frame: '{0}'.".format(s)
         raise argparse.ArgumentTypeError(msg)
 
 
