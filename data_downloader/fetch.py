@@ -42,12 +42,6 @@ async def get(url):
 
 
 def create_tasks(symbol, day):
-
-    start = 0
-
-    if is_dst(day):
-        start = 1
-
     url_info = {
         'currency': symbol,
         'year': day.year,
