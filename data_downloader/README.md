@@ -16,9 +16,9 @@ Key features :
  - Multi-thread support
  - All Dukascopy historical tick data
 
-This is what **duka** looks like:
+This is what the CLI looks like:
 
-![](./.img/Screenshot_2023-01-09_15-46-12.png)
+![CLI](./.img/Screenshot_2023-01-09_15-46-12.png)
 
 As you can see, it estimates the time left until the download is completed. This is extremely useful when downloading a large data set. 
 
