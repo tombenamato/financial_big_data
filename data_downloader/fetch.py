@@ -55,16 +55,6 @@ def create_tasks(symbol, day):
         'day': day.day
     }
     tasks = [asyncio.ensure_future(get(URL.format(**url_info)))]
-
-    # if is_dst(day):
-    #     next_day = day + datetime.timedelta(days=1)
-    #     url_info = {
-    #         'currency': symbol,
-    #         'year': next_day.year,
-    #         'month': next_day.month - 1,
-    #         'day': next_day.day
-    #     }
-    #     tasks.append(asyncio.ensure_future(get(URL.format(**url_info, hour=0))))
     return tasks
 
 
