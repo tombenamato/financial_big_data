@@ -18,7 +18,7 @@ Key features :
 
 This is what the CLI looks like:
 
-![CLI](./.img/Screenshot_2023-01-09_15-46-12.png)
+![CLI](img/Screenshot_2023-01-09_15-46-12.png)
 
 As you can see, it estimates the time left until the download is completed. This is extremely useful when downloading a large data set. 
 
