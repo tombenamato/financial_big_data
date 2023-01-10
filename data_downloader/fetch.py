@@ -28,19 +28,17 @@ def get(url: str) -> BytesIO:
         Raises:
             Exception: If the request fails after `ATTEMPTS` attempts.
         """
-    buffer = BytesIO()
     start = time.time()
     Logger.info("Fetching {0}".format(id))
     for i in range(ATTEMPTS):
         try:
             with requests.get(url, stream=True) as res:
                 if res.status_code == 200:
-                    for chunk in res.iter_content(DEFAULT_BUFFER_SIZE):
-                        buffer.write(chunk)
+                    buffer = res.content
                     Logger.info("Fetched {0} completed in {1}s".format(id, time.time() - start))
-                    if len(buffer.getbuffer()) <= 0:
+                    if len(buffer) <= 0:
                         Logger.info("Buffer for {0} is empty ".format(id))
-                    return buffer.getbuffer()
+                    return buffer
                 else:
                     time.sleep(1)
                     Logger.warn("Request to {0} failed with error code : {1} ".format(url, str(res.status_code)))
