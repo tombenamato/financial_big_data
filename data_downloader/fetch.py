@@ -1,9 +1,7 @@
-
-import asyncio
-import threading
+import datetime
 import time
-from functools import reduce
 from io import BytesIO, DEFAULT_BUFFER_SIZE
+
 
 import requests
 
@@ -15,15 +13,27 @@ URL = "http://datafeed.dukascopy.com/datafeed/{currency}/{year}/{month:02d}/{day
 ATTEMPTS = 30
 
 
-async def get(url):
-    loop = asyncio.get_event_loop()
+def get(url: str) -> BytesIO:
+    """Make an HTTP GET request to the specified URL using the requests library.
+
+        If the request fails or returns a non-200 status code, retry the request up to `ATTEMPTS` times. If the request is
+        successful, return the response body as a bytes object.
+
+        Args:
+            url (str): The URL to make the request to.
+
+        Returns:
+            bytes: The response body as a bytes object.
+
+        Raises:
+            Exception: If the request fails after `ATTEMPTS` attempts.
+        """
     buffer = BytesIO()
-    id = url[35:].replace('/', " ")
     start = time.time()
     Logger.info("Fetching {0}".format(id))
     for i in range(ATTEMPTS):
         try:
-            with await loop.run_in_executor(None, lambda: requests.get(url, stream=True)) as res:
+            with requests.get(url, stream=True) as res:
                 if res.status_code == 200:
                     for chunk in res.iter_content(DEFAULT_BUFFER_SIZE):
                         buffer.write(chunk)
@@ -40,27 +50,14 @@ async def get(url):
     raise Exception("Request failed for {0} after {1} attempts".format(url,ATTEMPTS ))
 
 
-def create_tasks(symbol, day):
-    url_info = {
-        'currency': symbol,
-        'year': day.year,
-        'month': day.month - 1,
-        'day': day.day
-    }
-    tasks = [asyncio.ensure_future(get(URL.format(**url_info)))]
-    return tasks
-
-
 def fetch_day(symbol, day):
-    local_data = threading.local()
-    loop = getattr(local_data, 'loop', asyncio.new_event_loop())
-    asyncio.set_event_loop(loop)
-    loop = asyncio.get_event_loop()
-    tasks = create_tasks(symbol, day)
-    loop.run_until_complete(asyncio.wait(tasks))
+    """Fetch the byte data for the specified day and symbol and return it.
+            Args:
+                symbol (str): The currency symbol.
+                day (datetime.datetime): The day to fetch data for.
 
-    def add(acc, task):
-        acc.write(task.result())
-        return acc
-
-    return reduce(add, tasks, BytesIO()).getbuffer()
+            Returns:
+                bytes: A bytes object containing the data.
+            """
+    url = URL.format(currency = symbol, year = day.year, month = day.month -1, day = day.day)
+    return get(url)

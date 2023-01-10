@@ -56,4 +56,5 @@ class ParquetDumper(object):
             df.vstack(self.buffer[day], in_place=True)
         df = df.select(["time (UTC)", "ask", "bid", "ask_volume", "bid_volume"])
         df.write_parquet(self.folder + "/" + file_name, compression="lz4")
+        print(df)
         Logger.info("{0} completed".format(file_name))
