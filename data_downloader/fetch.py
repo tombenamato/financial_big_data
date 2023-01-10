@@ -23,21 +23,20 @@ async def get(url):
     Logger.info("Fetching {0}".format(id))
     for i in range(ATTEMPTS):
         try:
-            res = await loop.run_in_executor(None, lambda: requests.get(url, stream=True))
-            if res.status_code == 200:
-                for chunk in res.iter_content(DEFAULT_BUFFER_SIZE):
-                    buffer.write(chunk)
-                Logger.info("Fetched {0} completed in {1}s".format(id, time.time() - start))
-                if len(buffer.getbuffer()) <= 0:
-                    Logger.info("Buffer for {0} is empty ".format(id))
-                return buffer.getbuffer()
-            else:
-                time.sleep(1)
-                Logger.warn("Request to {0} failed with error code : {1} ".format(url, str(res.status_code)))
+            with await loop.run_in_executor(None, lambda: requests.get(url, stream=True)) as res:
+                if res.status_code == 200:
+                    for chunk in res.iter_content(DEFAULT_BUFFER_SIZE):
+                        buffer.write(chunk)
+                    Logger.info("Fetched {0} completed in {1}s".format(id, time.time() - start))
+                    if len(buffer.getbuffer()) <= 0:
+                        Logger.info("Buffer for {0} is empty ".format(id))
+                    return buffer.getbuffer()
+                else:
+                    time.sleep(1)
+                    Logger.warn("Request to {0} failed with error code : {1} ".format(url, str(res.status_code)))
         except Exception as e:
             Logger.warn("Request {0} failed with exception : {1}".format(id, str(e)))
             time.sleep(1)
-
     raise Exception("Request failed for {0} after {1} attempts".format(url,ATTEMPTS ))
 
 
