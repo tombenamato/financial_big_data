@@ -72,8 +72,7 @@ def app(symbols: List[str], start: date, end: date, threads: int, folder: str) -
             tqdm(total=total_days) as progress_bar:
         for symbol in symbols:
             with ParquetDumper(symbol, start, end, folder) as file:
-                work_queue = [(symbol, day) for day in days(start, end)]
-                futures = [executor.submit(do_work, symbol, day, file) for symbol, day in work_queue]
+                futures = [executor.submit(do_work, symbol, day, file) for day in days(start, end)]
                 for future in concurrent.futures.as_completed(futures):
                     if future.exception() is None:
                         progress_bar.update(1)
