@@ -59,7 +59,7 @@ def decompress(day: pl.Date, compressed_buffer: bytes) -> pl.DataFrame:
     # Attempt to decompress the buffer
     try:
         decompressed_buffer = lzma.decompress(compressed_buffer)
-    except lzma.error as e:
+    except Exception as e:
         # Handle decompression errors
         Logger.error(f"Error decompressing buffer: {e}")
         print(f"Error decompressing buffer: {e}")

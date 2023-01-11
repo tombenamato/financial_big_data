@@ -1,8 +1,10 @@
+import asyncio
 from queue import Queue
 import datetime
 import time
 from multiprocessing import Manager
 import requests
+from aiohttp import ClientSession
 
 from utils import Logger
 from threading import Lock
@@ -17,9 +19,9 @@ MAX_CACHE_SIZE = 10_000
 ATTEMPTS = 300
 GET_MAX_WAITING_TIME=2
 MAX_THREAD_USAGE = 20
-MIN_THREAD_USAGE = -2
+MIN_THREAD_USAGE = -10
 URL = "http://datafeed.dukascopy.com/datafeed/{currency}/{year}/{month:02d}/{day:02d}_ticks.bi5"
-ATTEMPTS = 1000
+ATTEMPTS = 100
 
 manager = Manager()
 working_proxies = manager.dict()
@@ -35,6 +37,7 @@ def update_proxy():
             if nbr_thread>=MIN_THREAD_USAGE and nbr_thread<=MAX_THREAD_USAGE:
                 recent_proxies.put_nowait(proxy)
         print(active_proxy)
+        print(recent_proxies.qsize())
         for proxy in recent_proxies.queue:
             working_proxies[proxy] +=1
         if recent_proxies.qsize() ==0:
@@ -79,56 +82,45 @@ def fetch_proxy():
     return fetch_proxy()
 
 
+semaphore = asyncio.Semaphore(1000)
 
-
-def get(url: str) -> bytes:
-    """Make an HTTP GET request to the specified URL using the requests library.
-
-        If the request fails or returns a non-200 status code, retry the request up to `ATTEMPTS` times. If the request is
-        successful, return the response body as a bytes object.
-
-        Args:
-            url (str): The URL to make the request to.
-
-        Returns:
-            bytes: The response body as a bytes object.
-
-        Raises:
-            Exception: If the request fails after `ATTEMPTS` attempts.
-        """
-    start = time.time()
+async def get(session, url: str) -> bytes:
     Logger.info("Fetching {0}".format(id))
-    for i in range(ATTEMPTS):
-        proxy = fetch_proxy()
-        # print('-')
-        try:
-            with requests.get(url, proxies={'http': proxy, 'https': proxy}, timeout=GET_MAX_WAITING_TIME) as res:
-                working_proxies[proxy] = working_proxies[proxy] -1 if working_proxies[proxy]>0 else 0 #case for 2nd chance
-                if res.status_code == 200:
-                    buffer = res.content
-                    Logger.info("Fetched {0} completed in {1}s".format(id, time.time() - start))
-                    if len(buffer) <= 0:
-                        Logger.info("Buffer for {0} is empty ".format(id))
-                    return buffer
-                else:
-                    # print("--------------------------------------------")
-                    Logger.warn("Request to {0} failed with error code : {1} ".format(url, str(res.status_code)))
-        except Exception as e:
-            Logger.warn("Request {0} failed with exception : {1}".format(id, str(e)))
-            #print("----------")
-            working_proxies[proxy] -= 2
+    async with semaphore:
+        for i in range(ATTEMPTS):
+            proxy = fetch_proxy()
+            # print('-')
+            try:
+                async with session.get(url, proxy = proxy, timeout=GET_MAX_WAITING_TIME) as response:
+                    working_proxies[proxy] = working_proxies[proxy] - 1 if working_proxies[proxy] > 0 else 0  # case for 2nd chance
+                    if response.status == 200:
+                        buffer = await response.read()
+                        return buffer
+            except Exception as e:
+                Logger.warn("Request {0} failed with exception : {1}".format(id, str(e)))
+                #print("----------")
+                working_proxies[proxy] -= 2
     print("too many bad proxy")
     raise Exception("Request failed for {0} after {1} attempts".format(url, ATTEMPTS))
 
 
-def fetch_day(symbol, day):
-    """Fetch the byte data for the specified day and symbol and return it.
-            Args:
-                symbol (str): The currency symbol.
-                day (datetime.datetime): The day to fetch data for.
+async def fetch_async(symbol, days, progress_bar):
+    tasks = []
+    async with ClientSession() as session:
+        for day in days:
+            url = URL.format(currency=symbol, year=day.year, month=day.month - 1, day=day.day)
+            task = asyncio.ensure_future(get(session, url))
+            tasks.append(task)
+        responses = []
+        for future in asyncio.as_completed(tasks):
+            responses.append(await future)
+            progress_bar.update()
+        #responses = await asyncio.gather(*tasks)
+    return responses
 
-            Returns:
-                bytes: A bytes object containing the data.
-            """
-    url = URL.format(currency=symbol, year=day.year, month=day.month - 1, day=day.day)
-    return get(url)
+def fetch(symbol, days,progress_bar):
+    loop = asyncio.get_event_loop()
+    future = asyncio.ensure_future(fetch_async(symbol, days, progress_bar))
+    loop.run_until_complete(future)
+    responses = future.result()
+    return zip(responses, days)
