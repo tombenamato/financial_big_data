@@ -48,7 +48,10 @@ def how_many_days(start: date, end: date) -> int:
 
 def do_work(symbol: str, day: date, parquet: ParquetDumper) -> None:
     Logger.info("Fetching day {0}".format(day))
-    parquet.append(day, decompress(day, fetch_day(symbol, day)))
+    try :
+        parquet.append(day, decompress(day, fetch_day(symbol, day)))
+    except Exception as e:
+        do_work(symbol, day, parquet)
 
 
 def app(symbols: List[str], start: date, end: date, threads: int, folder: str) -> None:
