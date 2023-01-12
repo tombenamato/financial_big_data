@@ -62,12 +62,12 @@ async def process_and_save_data(symbol: str, data: bytes, day: date, file: Parqu
     """
     try :
         decompressed_data = await asyncio.get_event_loop().run_in_executor(None,decompress,symbol, day,data)
+        file.append(day, decompressed_data)
     except Exception as e:
         print(f"Retry download for {symbol} at {day}")
         retry_response = fetch_synchrone(symbol, day)
         print(f"Download finish : continue processing")
-        return process_and_save_data(retry_response(symbol, data, day, file))
-    file.append(day,decompressed_data)
+        process_and_save_data(retry_response(symbol, data, day, file))
 
 def app(symbols: List[str], start: date, end: date, threads: int, folder: str) -> None:
     """Fetches and processes data for the given symbols, dates, and threads, and stores the results in the given folder.
