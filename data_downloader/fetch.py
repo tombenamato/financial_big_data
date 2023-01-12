@@ -1,13 +1,15 @@
 import asyncio
+from asyncio import Semaphore
 from queue import Queue
 import time
 from multiprocessing import Manager
 from datetime import date
-
+from typing import Tuple, List
 
 import aiohttp
 import requests
 from aiohttp import ClientSession
+from tqdm import tqdm
 
 from utils import Logger
 from threading import Lock
@@ -23,9 +25,9 @@ VALIDATE_URL = "https://www.google.com"
 MAX_CACHE_SIZE = 10_000
 ATTEMPTS = 50
 GET_MAX_WAITING_TIME = 2
-GET_GENERAL_COOLDOWN = 5
+GET_GENERAL_COOLDOWN = 1
 MAX_THREAD_USAGE = 20
-MIN_THREAD_USAGE = -5 # imlpying each proxy have MIN_THREAD_USAGE continuous chance before been removing if error
+MIN_THREAD_USAGE = -5  # imlpying each proxy have MIN_THREAD_USAGE continuous chance before been removing if error
 URL = "http://datafeed.dukascopy.com/datafeed/{currency}/{year}/{month:02d}/{day:02d}_ticks.bi5"
 
 manager = Manager()
@@ -54,7 +56,7 @@ def update_proxy():
     # cold restart, we wait for other thread to finish otherwise could remove
     time.sleep(GET_MAX_WAITING_TIME + GET_GENERAL_COOLDOWN)
     proxies = set()
-    #fetch proxy from different source
+    # fetch proxy from different source
     with requests.get(PROXY_ULTRA_FAST_URL) as response:
         ultra_fast_proxy = response.text.split('\n')
         proxies.update(ultra_fast_proxy)
@@ -90,8 +92,7 @@ def fetch_proxy():
     return fetch_proxy()
 
 
-
-def fetch_synchrone(symbol : str, day: date) -> bytes:
+def fetch_synchrone(symbol: str, day: date) -> bytes:
     """Make an HTTP GET request to the specified URL using the requests library.
         If the request fails or returns a non-200 status code, retry the request up to `ATTEMPTS` times. If the request is
         successful, return the response body as a bytes object.
@@ -111,7 +112,8 @@ def fetch_synchrone(symbol : str, day: date) -> bytes:
         # print('-')
         try:
             with requests.get(url, proxies={'http': proxy, 'https': proxy}, timeout=GET_MAX_WAITING_TIME) as res:
-                working_proxies[proxy] = working_proxies[proxy] -1 if working_proxies[proxy]>0 else 0 #case for 2nd chance
+                working_proxies[proxy] = working_proxies[proxy] - 1 if working_proxies[
+                                                                           proxy] > 0 else 0  # case for 2nd chance
                 if res.status_code == 200:
                     buffer = res.content
                     Logger.info("Fetched {0} completed in {1}s".format(id, time.time() - start))
@@ -123,12 +125,29 @@ def fetch_synchrone(symbol : str, day: date) -> bytes:
                     Logger.warn("Request to {0} failed with error code : {1} ".format(url, str(res.status_code)))
         except Exception as e:
             Logger.warn("Request {0} failed with exception : {1}".format(id, str(e)))
-            #print("----------")
+            # print("----------")
             working_proxies[proxy] -= 2
     print("too many bad proxy")
     raise Exception("Request failed for {0} after {1} attempts".format(url, ATTEMPTS))
 
-async def get(session, url: str, day, semantic) -> (bytes, date):
+
+async def get(session: ClientSession, url: str, day, semantic) -> Tuple[bytes, date]:
+    """
+        This function is responsible for sending a GET request to a specific url and returning the response as bytes.
+        It uses a proxy server from the pool of available proxy servers.
+        It retries the request with a different proxy if it fails and lower the fail proxy alive number.
+
+        Args:
+            session (ClientSession): session object to send the request
+            url (str): the url to fetch the data from
+            day (date): the date of the data
+            semantic (asyncio.Semaphore): semaphore object used to limit the number of parallel requests
+
+        Returns:
+            Tuple: a tuple containing the response data as bytes and the date of the data
+        Raises:
+            Exception: If the request fails after `ATTEMPTS` attempts.
+        """
     Logger.info("Fetching {0}".format(id))
     async with semantic:
         try:
@@ -150,18 +169,23 @@ async def get(session, url: str, day, semantic) -> (bytes, date):
             raise Exception("Request failed for {0} after {1} attempts".format(url, ATTEMPTS))
 
 
-async def fetch_async(symbol, days, threads, semantic, progress_bar):
+async def fetch_async(symbol: str, days: date, threads: int, semantic: Semaphore, progress_bar: tqdm) -> List[
+    Tuple[bytes, date]]:
     """
+    This function is responsible for fetching data for a specific symbol for a given range of days.
+    It creates a list of tasks, each one responsible for fetching data for a specific day and adds them to a list.
+    Then, it waits for each task to complete and appends the result to a list of responses.
+    It also updates the progress bar for each completed task.
 
     Args:
-        symbol:
-        days:
-        threads:
-        semantic:
-        progress_bar:
+        symbol (str): the symbol to fetch data for
+        days (date): a range of dates to fetch data for
+        threads (int): the number of parallel requests
+        semantic (asyncio.Semaphore): semaphore object used to limit the number of parallel requests
+        progress_bar (tqdm): progress bar object to display the progress of the fetching process
 
     Returns:
-        List[Future[Byte, Date]]
+        List[Tuple[bytes, date]]: list of tuples, each containing the data as bytes and the date of the data
     """
     tasks = []
     client_timeout = aiohttp.ClientTimeout(total=GET_MAX_WAITING_TIME)
@@ -180,20 +204,25 @@ async def fetch_async(symbol, days, threads, semantic, progress_bar):
     return responses
 
 
-def fetch(symbols, days, progress_bar, threads=1000):
+def fetch(symbols: str, days: date, progress_bar: tqdm, threads: int = 1000) -> List[List[Tuple[bytes, date]]]:
     """
-    return data of multiple symbol in order of symbols
-    Args:
-        symbols:
-        days:
-        progress_bar:
+        This function is responsible for fetching data for a list of symbols for a given range of days.
+        It creates a list of futures, each one responsible for fetching data for a specific symbol and adds them to a list.
+        Then, it waits for all the futures to complete and returns the result.
 
-    Returns:
+        Args:
+            symbols (List[str]): list of symbols to fetch data for
+            days (List[date]): a range of dates to fetch data for
+            progress_bar (tqdm): progress bar object to display the progress of the fetching process
+            threads (int): the number of parallel requests
 
-    """
+        Returns:
+            List[List[Tuple[bytes, date]]]: list of lists, each containing the data as bytes and the date of the data
+        """
     semantic = asyncio.Semaphore(threads)
     loop = asyncio.get_event_loop()
-    futures = [fetch_async(symbol, days, threads, semantic, progress_bar) for symbol in symbols] #List[1 elem per symbol Coroutine[List[Future[Byte, Date]]]]
-    future = asyncio.ensure_future(asyncio.gather(*futures)) #Future[List[ List[Future[Byte, Date]]]]
+    futures = [fetch_async(symbol, days, threads, semantic, progress_bar) for symbol in
+               symbols]
+    future = asyncio.ensure_future(asyncio.gather(*futures))
     loop.run_until_complete(future)
-    return future.result()#List[ List[Future[Byte, Date]]]
+    return future.result()  # List[ List[[Byte, Date]]]
