@@ -1,18 +1,20 @@
 import polars as pl
 from utils import Logger
+from datetime import date
+
 
 TEMPLATE_FILE_NAME = "{}-{}_{:02d}_{:02d}-{}_{:02d}_{:02d}.parquet"
 
 
 class ParquetDumper(object):
-    def __init__(self, symbol: str, start: pl.Date, end: pl.Date, folder: str) -> None:
+    def __init__(self, symbol: str, start: date, end: date, folder: str) -> None:
         """Initialize a new ParquetDumper instance.
 
         Args:
-            symbol: The symbol to dump.
-            start: The start date of the data.
-            end: The end date of the data.
-            folder: The folder to save the dumped data in.
+            symbol (str): The symbol to dump.
+            start (date): The start date of the data.
+            end (date): The end date of the data.
+            folder (str): The folder to save the dumped data in.
         """
         self.symbol = symbol
         self.start = start
@@ -27,12 +29,12 @@ class ParquetDumper(object):
         self.dump()
         self.buffer = {}
 
-    def append(self, day: pl.Date, ticks: pl.DataFrame) -> None:
+    def append(self, day: date, ticks: pl.DataFrame) -> None:
         """Append data for a specific day to the buffer.
 
         Args:
-            day: The day of the data.
-            ticks: The data to append.
+            day (date): The day of the data.
+            ticks (pl.DataFame),: The data to append.
         """
         if not ticks.is_empty():
             self.buffer[day] = ticks
@@ -56,5 +58,4 @@ class ParquetDumper(object):
             df.vstack(self.buffer[day], in_place=True)
         df = df.select(["time (UTC)", "ask", "bid", "ask_volume", "bid_volume"])
         df.write_parquet(self.folder + "/" + file_name, compression="lz4")
-        print(df)
         Logger.info("{0} completed".format(file_name))

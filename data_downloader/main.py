@@ -19,7 +19,7 @@ def main():
                         default=date.today() - timedelta(1))
     parser.add_argument('-s', '--startdate', type=valid_date, help='start date format YYYY-MM-DD (default today)')
     parser.add_argument('-e', '--enddate', type=valid_date, help='end date format YYYY-MM-DD (default today)')
-    parser.add_argument('-t', '--thread', type=int, help='number of threads (default 20)', default=20)
+    parser.add_argument('-t', '--thread', type=int, help='number of threads (default 1000)', default=1000)
     parser.add_argument('-f', '--folder', type=str, help='destination folder (default .)', default='.')
     args = parser.parse_args()
 
