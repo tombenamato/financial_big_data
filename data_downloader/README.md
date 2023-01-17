@@ -1,24 +1,33 @@
 # Dukascopy data downloader 
 
-Finding good Forex data is difficult or expensive. Dukascopy has made available an excellent [web tool](https://www.dukascopy.com/swiss/english/marketwatch/historical/) to download tick data for a large a variety of 
-Forex, CFD and commodities. This is awesome and extremely useful for people, like us, trying to study the Finance market. 
-  However, it takes a lot of time to download a large data set from the website because you can download only one day per time. Some open code exist to make it automatic like duka or dukascopy node on GitHub. However, this code are not optimized and or do not work anymore.
+Finding good Forex data is difficult or expensive. Dukascopy has made available an excellent 
+[web tool](https://www.dukascopy.com/swiss/english/marketwatch/historical/) to download tick data for a large a variety 
+of Forex, CFD and commodities. This is awesome and extremely useful for people, like us, trying to study the Finance market. 
+However, it takes a lot of time to download a large data set from the website because you can download only one day 
+per time. Some open code exist to make it automatic like duka or dukascopy node on GitHub. However, this code are not 
+optimized and or do not work anymore.
 
-In order to solve this issue we implemented our own downloader. The most helpful resource that we used was the duka GitHub repository.  
+In order to solve this issue we implemented our own downloader.  
 
-The result is a small terminal application (it can also be used through its app function) that can be used to download ticks for a given date range from the Dukascopy historical data feed for one or more symbols. It takes advantage of multiple threads in order to speed up the download. Moreover, it uses in our knowledge the best api of Dukascopy to download in bulk, that is the daily download and not the hourly like most other code do. Improved, it now takes roughly 20s to download tick data for one year for a given french instrument (csv size: 200mb). Not bad :)
+The result is a small terminal application (it can also be used through its app function) that can be used to download 
+ticks for a given date range from the Dukascopy historical data feed for one or more symbols. It takes advantage of 
+multiple threads and proxies in order to speed up the download. Moreover, it uses in our knowledge the best api of 
+Dukascopy to download in bulk, that is the daily download and not the hourly like most other code do. Improved, it 
+now takes roughly 1.5s (vs 400s with the Dukascopy JForex 4 app) to download tick data for one year for a given french
+instrument (csv size: 200mb). Note that results depends on the proxies and your bandwidth. Not bad :)
 
-Moreover, it save the data in a parquet compressed file instead of a csv like other solution we found.
+Moreover, it save the data in a parquet compressed file instead of a csv like other solutions we found.
 
 Key features :
  - Ticks data ask/bid and associated volumes
  - Parquet lz4 compression output
  - Multi-thread support
  - All Dukascopy historical tick data
+ - Proxy download
 
 This is what the CLI looks like:
 
-![CLI](.img/Screenshot_2023-01-09_15-46-12.png)
+![CLI](.img/screenshot_CLI.png)
 
 As you can see, it estimates the time left until the download is completed. This is extremely useful when downloading a large data set. 
 
@@ -39,7 +48,7 @@ I hope you enjoy it!!
      -s STARTDATE start date format YYYY-MM-DD (default today)
      -e ENDDATE   end date format YYYY-MM-DD (default today)
      -f FOLDER    the dowloaded data will be saved in FOLDER (default '.')
-     -t THREAD    number of threads (default 20)
+     -t THREAD    number of threads (default 1000)
 ```
 
 ## Examples
@@ -77,7 +86,7 @@ I hope you enjoy it!!
 All data is saved in the current folder. You can also specify the number of threads to be used by setting the `t` option. 
 I recommend not to use too many threads because you might encounter problems opening too many connection to the server. 
  
-Best number of concurrent requests (threads) is 20-30 one day tick data. After this the server is too busy and respond in error, even with different ticker. One could try to different computer in parallel.
+The optimal number of concurrent requests (threads), depend on the quality of the proxies. To change the proxy list, change the links in fetch.py.
 
 ## License
 

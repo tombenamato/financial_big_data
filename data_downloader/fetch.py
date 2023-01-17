@@ -14,7 +14,7 @@ from tqdm import tqdm
 from utils import Logger
 from threading import Lock
 
-MIN_PROXY = 80
+MIN_PROXY = 50
 
 PROXY_ULTRA_FAST_URL = "https://raw.githubusercontent.com/saschazesiger/Free-Proxies/master/proxies/ultrafast.txt"
 PROXY_FAST_URL = "https://raw.githubusercontent.com/saschazesiger/Free-Proxies/master/proxies/fast.txt"
@@ -94,46 +94,6 @@ async def fetch_proxy():
             else:
                 await asyncio.sleep(0) #return to task manager so other work can be done
 
-#
-# def fetch_synchrone(symbol: str, day: date) -> bytes:
-#     """Make an HTTP GET request to the specified URL using the requests library.
-#         If the request fails or returns a non-200 status code, retry the request up to `ATTEMPTS` times. If the request is
-#         successful, return the response body as a bytes object.
-#         Args:
-#             symbol (str): The symbol of the financial asset.
-#             day (date): The date of the data.
-#         Returns:
-#             bytes: The response body as a bytes object.
-#         Raises:
-#             Exception: If the request fails after `ATTEMPTS` attempts.
-#         """
-#     url = get_url(day, symbol)
-#     start = time.time()
-#     Logger.info("Fetching {0}".format(id))
-#     for i in range(ATTEMPTS):
-#         proxy = fetch_proxy()
-#         # print('-')
-#         try:
-#             with requests.get(url, proxies={'http': proxy, 'https': proxy}, timeout=GET_MAX_WAITING_TIME) as res:
-#                 working_proxies[proxy] = working_proxies[proxy] - 1 if working_proxies[
-#                                                                            proxy] > 0 else 0  # case for 2nd chance
-#                 if res.status_code == 200:
-#                     buffer = res.content
-#                     Logger.info("Fetched {0} completed in {1}s".format(id, time.time() - start))
-#                     if len(buffer) <= 0:
-#                         Logger.info("Buffer for {0} is empty ".format(id))
-#                     return buffer
-#                 else:
-#                     # print("--------------------------------------------")
-#                     Logger.warn("Request to {0} failed with error code : {1} ".format(url, str(res.status_code)))
-#         except Exception as e:
-#             Logger.warn("Request {0} failed with exception : {1}".format(id, str(e)))
-#             # print("----------")
-#             working_proxies[proxy] -= 2
-#     print("too many bad proxy")
-#     raise Exception("Request failed for {0} after {1} attempts".format(url, ATTEMPTS))
-
-
 class DataFetcher(object):
     def __init__(self, threads: int = 1000) -> None:
         client_timeout = aiohttp.ClientTimeout(total=GET_MAX_WAITING_TIME)
@@ -163,8 +123,8 @@ class DataFetcher(object):
 
     async def get(self, symbol, day) -> Tuple[bytes, date]:
         """
-            This function is responsible for sending a GET request to a specific url and returning the response as bytes.
-            It uses a proxy server from the pool of available proxy servers.
+            This function is responsible for obtaining the data for a symbol and a date and return the data as bytes.
+            It uses a proxy server from the pool of available proxy servers, to speedup the download.
             It retries the request with a different proxy if it fails and lower the fail proxy alive number.
 
             Args:
@@ -179,22 +139,21 @@ class DataFetcher(object):
         Logger.info("Fetching {0}".format(id))
         url = DataFetcher.get_url(symbol, day)
         async with self.semantic:
-            try:
-                for i in range(ATTEMPTS):
-                    proxy = await fetch_proxy()
-                    try:
-                        async with self.session.get(url, proxy=proxy) as response:
-                            if response.status == 200:
-                                working_proxies[proxy] = working_proxies[proxy] - 1 if working_proxies[
-                                                                                           proxy] > 0 else 0  # case for 2nd chance
-                                buffer = await response.read()
-                                return buffer, day
-                    except Exception as e:
-                        Logger.warn("Request {0} failed with exception : {1}".format(id, str(e)))
-                    working_proxies[proxy] -= 2
-            except Exception as e:
-                print("Request failed for {0} after {1} attempts".format(url, ATTEMPTS))
-                raise Exception("Request failed for {0} after {1} attempts".format(url, ATTEMPTS))
+            for i in range(ATTEMPTS):
+                proxy = await fetch_proxy()
+                try:
+                    async with self.session.get(url, proxy=proxy) as response:
+                        if response.status == 200:
+                            working_proxies[proxy] = working_proxies[proxy] - 1 if working_proxies[
+                                                                                       proxy] > 0 else 0  # case for 2nd chance
+                            buffer = await response.read()
+                            return buffer, day
+                except Exception as e:
+                    Logger.warn("Request {0} failed with exception : {1}".format(id, str(e)))
+                working_proxies[proxy] -= 2
+        print("Request failed for {0} after {1} attempts".format(url, ATTEMPTS))
+        print(f"Check if the symbol{symbol} is available for this date {day}: it will slow down a lot the download")
+        return b'', day
 
     async def fetch_async(self, symbol: str, days: List[date], progress_bar: tqdm) -> List[
         Tuple[bytes, date]]:
@@ -214,7 +173,7 @@ class DataFetcher(object):
         """
         tasks = []
         for day in days:
-            task = asyncio.ensure_future(self.get(symbol, day))
+            task = self.get(symbol, day)
             tasks.append(task)
         responses = []
         for future in asyncio.as_completed(tasks):
@@ -227,9 +186,9 @@ class DataFetcher(object):
     def fetch(self, symbols: List[str], days: List[date], progress_bar: tqdm) -> List[
         List[Tuple[bytes, date]]]:
         """
-            This function is responsible for fetching data for a list of symbols for a given range of days.
-            It creates a list of futures, each one responsible for fetching data for a specific symbol and adds them to a list.
-            Then, it waits for all the futures to complete and returns the result.
+        This function is responsible for fetching data for a list of symbols for a given range of days. It creates a
+        list of futures, each one responsible for fetching data for a specific symbol and adds them to a list. Then,
+        it waits for all the futures to complete and returns the result.
 
             Args:
                 symbols (List[str]): list of symbols to fetch data for
@@ -242,5 +201,5 @@ class DataFetcher(object):
         futures = [self.fetch_async(symbol, days, progress_bar) for symbol in
                    symbols]
         future = asyncio.gather(*futures)
-        loop.run_until_complete(future)
-        return future.result()  # List[ List[[Byte, Date]]]
+        result = loop.run_until_complete(future)
+        return result  # List[ List[[Byte, Date]]]

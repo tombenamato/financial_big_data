@@ -56,8 +56,8 @@ async def process_and_save_data(symbol: str, day: date, data: bytes, file: Parqu
 
     Parameters:
     symbol (str): The symbol of the financial asset.
-    data (bytes): The binary data to be processed.
     day (date): The date of the data.
+    data (bytes): The binary data to be processed.
     file (ParquetDumper): The file to append the processed data to.
     data_fetcher (DataFetcher): The data fetcher in case we need to re download
     """
