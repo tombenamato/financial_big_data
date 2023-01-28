@@ -68,7 +68,7 @@ async def process_and_save_data(symbol: str, day: date, data: bytes, file: Parqu
         print(f"Retry download for {symbol} at {day}")
         retry_response = await data_fetcher.get(symbol, day)
         print(f"Download finish : continue processing")
-        await process_and_save_data(symbol, retry_response, day, file)
+        await process_and_save_data(symbol, day ,retry_response, file, data_fetcher)
 
 
 def app(symbols: List[str], start: date, end: date, threads: int, folder: str) -> None:
