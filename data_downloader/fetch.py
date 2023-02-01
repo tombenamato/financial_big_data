@@ -54,7 +54,8 @@ async def update_proxy():
             await asyncio.sleep(0.5)  # wait for a proxy to be released
         return
     # cold restart, we wait for other thread to finish otherwise could remove
-    await asyncio.sleep(GET_MAX_WAITING_TIME + GET_GENERAL_COOLDOWN)  ## problem here need asyncio so other coroutine can be run
+    await asyncio.sleep(
+        GET_MAX_WAITING_TIME + GET_GENERAL_COOLDOWN)  ## problem here need asyncio so other coroutine can be run
     proxies = set()
     # fetch proxy from different source
     with requests.get(PROXY_ULTRA_FAST_URL) as response:
@@ -78,6 +79,7 @@ async def update_proxy():
         working_proxies[proxy] = 0
     await update_proxy()
 
+
 async def fetch_proxy():
     """Fetch a new proxy from the proxy list.
 
@@ -92,7 +94,8 @@ async def fetch_proxy():
                 await update_proxy()
                 update_proxies_lock.release()
             else:
-                await asyncio.sleep(0) #return to task manager so other work can be done
+                await asyncio.sleep(0)  # return to task manager so other work can be done
+
 
 class DataFetcher(object):
     def __init__(self, threads: int = 1000) -> None:
@@ -116,6 +119,7 @@ class DataFetcher(object):
                 day (date): The date of the data.
 
         Returns:
+            str : the url to fetch from
 
         """
         url = URL.format(currency=symbol, year=day.year, month=day.month - 1, day=day.day)
@@ -135,7 +139,7 @@ class DataFetcher(object):
                 Tuple: a tuple containing the response data as bytes and the date of the data
             Raises:
                 Exception: If the request fails after `ATTEMPTS` attempts.
-            """
+        """
         Logger.info("Fetching {0}".format(id))
         url = DataFetcher.get_url(symbol, day)
         async with self.semantic:
